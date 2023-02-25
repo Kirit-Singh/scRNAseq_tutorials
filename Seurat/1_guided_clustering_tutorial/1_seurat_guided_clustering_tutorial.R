@@ -10,7 +10,9 @@
 ## G. LINEAR DIMENSIONAL REDUCTION
 ## H. DETERMINE DIMENSIONALITY OF THE DATASET
 ## I. CLUSTER THE CELLS
-## H. RUN NON-LINEAR DIMENSIONAL REDUCTION (UMAP/tSNE)
+## J. RUN NON-LINEAR DIMENSIONAL REDUCTION (UMAP/tSNE)
+## K. CLUSTER BIOMARKERS
+## L. ASSIGNING CELL TYPE TO CLUSTERS
 
 
 ## A. INSTALLATION - using RStudio (https://posit.co/downloads/)
@@ -248,25 +250,107 @@ pbmc <- FindClusters(pbmc, resolution = 0.5)
 head(Idents(pbmc), 5)
 
 
-## H. RUN NON-LINEAR DIMENSIONAL REDUCTION (UMAP/tSNE)
-## H. tSNE and UMAP visualizes and explores these datasets. Places similar cells
+## J. RUN NON-LINEAR DIMENSIONAL REDUCTION (UMAP/tSNE)
+## J. tSNE and UMAP visualizes and explores these datasets. Places similar cells
 ##    together in low-dimensional space. Use same PCs as input to clustering
 ##    analysis (10)
 
-## H. If you haven't installed UMAP, you can do so via reticulate::py_install(packages =
+## J. If you haven't installed UMAP, you can do so via reticulate::py_install(packages =
 ## 'umap-learn')
 # reticulate::py_install(packages = 'umap-learn')
 pbmc <- RunUMAP(pbmc, dims = 1:10)
 
-## H. Note that you can set `label = TRUE` or use the LabelClusters function to 
+## J. Note that you can set `label = TRUE` or use the LabelClusters function to 
 ##    help label individual clusters
 DimPlot(pbmc, reduction = "umap")
 
-## H. Can save the object at this point so it can be easily loaded back in 
+## J. Can save the object at this point so it can be easily loaded back in 
 ##    without having to rerun the computationally intensitve steps above, or
 ##    easily shared with collaborators
-dir.create("/output")
-saveRDS(pbmc, file = "/output/pbmc_tutorial.rds")
+dir.create("/output/")
+saveRDS(pbmc, file = "D:/Dropbox/scRNAseq/scRNAseq_tutorials/Seurat/1_guided_clustering_tutorial/output/pbmc_tutorial.rds")
 
 ## N.B. To load saved RDS file back into R: 
-##      pbmc <- readRDS(file = "/output/pbmc_tutorial.rds")
+##      pbmc <- readRDS(file = "D:/Dropbox/scRNAseq/scRNAseq_tutorials/Seurat/1_guided_clustering_tutorial/output/pbmc_tutorial.rds")
+
+
+## K. CLUSTER BIOMARKERS
+## K. Seurat helps to find markers that define clusters via differential exp.
+##    By default, it identified positive and negative markers of a single cluster
+##    (specificed in ident.1), compared to all other cells
+
+## K. FindAllMarkers() automates this process for all clusters, but can test
+##    groups of clusters vs each other or against all cells
+
+## K. min.pct argument requires a feature to be detected at a minimum percentage
+##    in either of the two groups of cells and the thresh.test argument requires
+##    a feature to be differentially expressed (on average) by some amount between
+##    the two groups. Can set these both to 0, but with big increase in time - will
+##    set up a large number of features that are unlikely to be highly discriminatory
+
+## K. Another option to speed up these computations, max.cells.per.ident can be set
+##    This will downsample each identity class to have no more cells than whatever
+##    this is set to. While this will result in a loss in power, speed increase is
+##    significant and most highly differentially expressed features will rise to top.
+
+
+## K. Find all markers of cluster 2
+cluster2.markers <- FindMarkers(pbmc, ident.1 = 2, min.pct = 0.25)
+head(cluster2.markers, n = 5)
+
+## K. Find all markers distinguishing cluster 5 from clusters 0 and 3
+cluster5.markers <- FindMarkers(pbmc, ident.1 = 5, ident.2 = c(0, 3), min.pct = 0.25)
+head(cluster5.markers, n = 5)
+
+## K. Find markers for every cluster compared to all remaining cells, report only the positive
+##    ones
+pbmc.markers <- FindAllMarkers(pbmc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+pbmc.markers %>%
+  group_by(cluster) %>%
+  slice_max(n = 2, order_by = avg_log2FC)
+
+## K. Seurate has several tests for differential expression that can be set with
+##    the test.use parameter. ROC test returns the classification power for any
+##    individual marker (ranging from 0-random to 1-perfect)
+cluster0.markers <- FindMarkers(pbmc, ident.1 = 0, logfc.threshold = 0.25, test.use = "roc", only.pos = TRUE)
+
+## K. Several tools to visualize marker expression. VlnPlot() shows expression
+##    probability distributions across clusters and FeaturePlot() visualizes
+##    feature expression on a tSNE or PCA plot are most commonly used visualizations
+
+## K. Can also try RidgePlot(), CellScatter(), DotPlot()
+VlnPlot(pbmc, features = c("MS4A1", "CD79A"))
+
+## K. You can plot raw counts as well
+VlnPlot(pbmc, features = c("NKG7", "PF4"), slot = "counts", log = TRUE)
+
+FeaturePlot(pbmc, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP",
+                               "CD8A"))
+
+## K. DoHeatmap() generates an expression heatmap for given cells and features. 
+##    In this case, we are plotting the top 20 markers (or all markers if less 
+##    than 20) for each cluster.
+pbmc.markers %>%
+  group_by(cluster) %>%
+  top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(pbmc, features = top10$gene) + NoLegend()
+
+
+## L. ASSIGNING CELL TYPE TO CLUSTERS
+##    Cluster ID	Markers	     Cell Type
+##    0	          IL7R, CCR7	 Naive CD4+ T
+##    1	          CD14, LYZ	   CD14+ Mono
+##    2	          IL7R,S100A4  Memory CD4+
+##    3	          MS4A1	       B
+##    4	          CD8A	CD8+   T
+##    5	          FCGR3A,MS4A7 FCGR3A+ Mono
+##    6	          GNLY, NKG7	 NK
+##    7	          FCER1A,CST3	 DC
+##    8	          PPBP	       Platelet
+new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
+                     "NK", "DC", "Platelet")
+names(new.cluster.ids) <- levels(pbmc)
+pbmc <- RenameIdents(pbmc, new.cluster.ids)
+DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+saveRDS(pbmc, file = "D:/Dropbox/scRNAseq/scRNAseq_tutorials/Seurat/1_guided_clustering_tutorial/output/pbmc3k_final.rds")
