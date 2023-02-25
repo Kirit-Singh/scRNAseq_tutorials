@@ -347,10 +347,13 @@ DoHeatmap(pbmc, features = top10$gene) + NoLegend()
 ##    6	          GNLY, NKG7	 NK
 ##    7	          FCER1A,CST3	 DC
 ##    8	          PPBP	       Platelet
+
+## L. Create UMAP plot with labels listed above
 new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
                      "NK", "DC", "Platelet")
 names(new.cluster.ids) <- levels(pbmc)
 pbmc <- RenameIdents(pbmc, new.cluster.ids)
 DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
 
+## L. Save File
 saveRDS(pbmc, file = "D:/Dropbox/scRNAseq/scRNAseq_tutorials/Seurat/1_guided_clustering_tutorial/output/pbmc3k_final.rds")
