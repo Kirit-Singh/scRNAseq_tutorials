@@ -6,3 +6,4 @@ This is a starting point for educational resources for scRNAseq analysis
 
 ## Resources used
 1. Seurat
+2. SCEVAN - https://github.com/AntonioDeFalco/SCEVAN
